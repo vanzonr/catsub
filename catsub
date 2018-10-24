@@ -1,0 +1,166 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+# catsub - little substitutor
+
+import sys
+import re
+import collections
+
+escaped_percentage_sign="％"  # abusing unicode character to escape '%'
+
+def print_help():
+   """print help message for the catsub command"""
+   
+   print("""
+   catsub - substitutes every value for each variable in each word of a template file.
+
+   Usage:
+
+     catsub [-h] [-e] [TEMPLATEFILE] [%VARNAME VALUE1 VALUE2 ... ]*
+
+   Arguments:
+
+     TEMPLATEFILE      Name of a file containg the template with
+                       variables of the from %VARNAME; If no file name
+                       is given, or the name is '-', catsub will read
+                       from standard input;
+     %VARNAME          Variable name to substitute;
+     VALUE1 VALUE2 ... Values to substitute for the variable;
+     -e, --escape      Escaped percentage in template are returned escaped;
+     -h, --help        Show this help page.
+
+   Notes: 
+
+   - The name of the TEMPLATEFILE may not start with a percent sign.  
+
+   - All variables must start with a percent sign and cannot contain
+     whitespace.
+
+   - Substituted values cannot start with a percent sign.
+
+   - Substitution happens only once per variable, i.e., substituted
+     values do not undergo subsequent substitutions.
+
+   - When a variable has been given several values to substitute ad
+     the variable occurs in a substring of a word in the template,
+     that word get repeated. E.g. "echo un%X | catsub %X kind tidy"
+     gives "unkind untidy"
+
+   - Substitution happens combinatorically within a word. E.g. a word
+     "%X,%Y" in the template, when processed with "catsub %X a b %Y c d"
+     becomes "a,c a,d b,c b,d". Combinatorics can be circumvented by
+     quoting the replacement values, i.e.  "catsub %X 'a b' %Y 'c d'"
+     gives "a b,c d".
+
+   - Substitution uses the longest possible variable name. E.g. in
+     "%HELLOWORLD", both %HELLO and %HELLOWORLD could be substituted
+     if values for both are specified on the catsub command, but it is
+     the longer %HELLOWORLD that gets used.
+   
+   - Percentage signs in the template can escape substitution by
+     prepeding them with a slash, i.e., '\%'.  Every '\%' in the
+     template will be replaced by '%' unless the -e or --escape
+     argument is used in the catsub command.
+
+   - The template cannot use the unicode character '％'.
+
+   Examples:
+
+     $ echo %HELLO %UNIVERSE | """+sys.argv[0]+""" %HELLO Hi %UNIVERSE world
+     Hi world
+
+     $ echo %HELLO %UNIVERSE > example.tmpl
+     $ """+sys.argv[0]+""" example.tmpl %HELLO Greetings %UNIVERSE universe!
+     Greetings universe!
+""")
+
+def main(filename, vararg, escape=False):
+
+   """
+   Process the template in filename, given the argument list with
+   variable definitions in vararg, possibly leaving escaped
+   percentages intact.
+
+   Arguments:
+
+     filename
+     vararg
+     escape
+   """
+   
+   assert(isinstance(filename,str))
+   assert(isinstance(vararg,list))
+   assert(isinstance(escape,bool))
+
+   # open file or use standard in
+   if filename == '-':
+      f = sys.stdin
+   else:
+      try:
+         f = open(filename, 'r')
+      except:
+         print sys.argv[0]+" error - could not open file '" + filename + "'."
+         sys.exit(1)
+
+   # Collect values for each variable from the command line.
+
+   values  = collections.defaultdict(list)
+   varname = '%DEFAULT'
+   for arg in vararg:
+      if arg[0] == '%':
+         if len(re.split(r'(\s+)', arg))==1:
+            varname = arg
+         else:
+            print sys.argv[0]+" error - '"+arg+"' is not a valid variable name."
+            sys.exit(1)
+
+      else:
+         # Ensure repeated substitution does not occur by escaping
+         # percentage signs
+         values[varname].append(arg.replace('%',escaped_percentage_sign))
+
+   # Process each line in the file and make substitutions in each word
+
+   try:
+
+      for line in f:
+         if escape:
+            line = line.replace('\\%','\\'+escaped_percentage_sign)
+         else:
+            line = line.replace('\\%',escaped_percentage_sign)
+         words = re.split(r'(\s+)', line)
+         for wordidx in range(len(words)):
+            for varname in sorted(values.keys(),reverse=True):#values:
+               if varname in words[wordidx]:
+                  replacements = []
+                  for value in values[varname]:
+                     replacements.append(words[wordidx].replace(varname,value))
+                  words[wordidx] = ' '.join(replacements)
+         replacedline = ''.join(words)
+         # Undo escaping of percentage sign
+         print replacedline.replace(escaped_percentage_sign,'%'),
+
+   except:
+
+      # Reading file or processing went wrong
+      print sys.argv[0]+" error - could not process file '" + filename + "'."
+      sys.exit(1)
+
+if __name__ == "__main__":
+
+   # Parse the arguments
+
+   if len(sys.argv)==1:
+      main('-', [])
+   elif sys.argv[1] in ['-h','--help']:
+      print_help()
+   elif sys.argv[1] in ['-e','--escape']:
+      if sys.argv[2][0]=='%':
+         main('-', sys.argv[2:], escape=True)
+      else:
+         main(sys.argv[2], sys.argv[3:], escape=True)
+   else:
+      if sys.argv[1][0]=='%':
+         main('-', sys.argv[1:], escape=False)
+      else:
+         main(sys.argv[1], sys.argv[2:], escape=False)
