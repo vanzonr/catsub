@@ -81,9 +81,8 @@ def print_help():
    
    - Percentage signs in the template can escape substitution by
      prepeding them with a slash, i.e., '\%'.  Every '\%' in the
-     template will be remain a '\%' unless the -u or --unescape
-     argument is used in the catsub command, in which case, they are
-     replaced by '%'.
+     template will be remain a '\%' unless the -u argument is used in
+     the catsub command, in which case, they are replaced by '%'.
 
    - The template cannot use the unicode character '％'.
 
