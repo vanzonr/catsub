@@ -19,6 +19,14 @@ Arguments:
      -e, --escape      Escaped percentage in template are returned escaped;
      -h, --help        Show this help page.
 
+## Prerequisites
+
+  -  Python 2.5+
+
+## Installation
+
+Simply copy the script to a location in the PATH.
+
 ## Notes
 
    - The name of the TEMPLATEFILE may not start with a percent sign.  
