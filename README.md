@@ -6,7 +6,7 @@ template file.
 
 ## Usage:
 
-  catsub [-h] [-e] [TEMPLATEFILE] [%VARNAME VALUE1 VALUE2 ... ]*
+    catsub [-h] [-e] [TEMPLATEFILE] [%VARNAME VALUE1 VALUE2 ... ]*
 
 Arguments:
 
@@ -56,10 +56,25 @@ Arguments:
 
 ## Examples
 
+The following examples work when called from a Linux shell (e.g. bash).
+
      $ echo %HELLO %UNIVERSE | ./catsub %HELLO Hi %UNIVERSE world
      Hi world
 
+     $ echo un%X | catsub %X kind tidy
+     unkind untidy
+     
+     $ echo %X,%Y | catsub %X a b %Y c d
+     a,c a,d b,c b,d
+
+     $ echo %X,%Y | catsub %X 'a b' %Y 'c d'
+     a b,c d
+     
      $ echo %HELLO %UNIVERSE > example.tmpl
      $ ./catsub example.tmpl %HELLO Greetings %UNIVERSE universe!
      Greetings universe!
+     $ ./catsub example.tmpl %HELLO Greetings %UNI Uni
+     Greetings Universe
+     $ ./catsub example.tmpl %HELLO Greetings %UNI Uni %UNIVERSE world!
+     Greetings world!
 
