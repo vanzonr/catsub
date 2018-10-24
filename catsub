@@ -38,22 +38,22 @@ def print_help():
 
    Usage:
 
-     catsub [-h] [-e] [TEMPLATEFILE] [%VARNAME VALUE1 VALUE2 ... ]*
+     catsub [--help] [-u] [TEMPLATEFILES] [%VARNAME VALUE1 VALUE2 ... ]*
 
    Arguments:
 
-     TEMPLATEFILE      Name of a file containg the template with
+     TEMPLATEFILES     Name(s) of file(s) containg the template with
                        variables of the from %VARNAME; If no file name
                        is given, or the name is '-', catsub will read
                        from standard input;
      %VARNAME          Variable name to substitute;
      VALUE1 VALUE2 ... Values to substitute for the variable;
-     -e, --escape      Escaped percentage in template are returned escaped;
-     -h, --help        Show this help page.
+     -u                Escaped percentage in template are returned unescaped;
+     --help            Show this help page.
 
    Notes: 
 
-   - The name of the TEMPLATEFILE may not start with a percent sign.  
+   - The names of the template files may not start with a percent sign.  
 
    - All variables must start with a percent sign and cannot contain
      whitespace.
@@ -81,8 +81,9 @@ def print_help():
    
    - Percentage signs in the template can escape substitution by
      prepeding them with a slash, i.e., '\%'.  Every '\%' in the
-     template will be replaced by '%' unless the -e or --escape
-     argument is used in the catsub command.
+     template will be remain a '\%' unless the -u or --unescape
+     argument is used in the catsub command, in which case, they are
+     replaced by '%'.
 
    - The template cannot use the unicode character '％'.
 
@@ -96,23 +97,23 @@ def print_help():
      Greetings universe!
 """)
 
-def main(filenames, vararg, escape=False):
+def main(filenames, vararg, unescape=False):
 
    """
    Process the template in filename, given the argument list with
-   variable definitions in vararg, possibly leaving escaped
+   variable definitions in vararg, possibly resolving escaped
    percentages intact.
 
    Arguments:
 
-     filename
-     vararg
-     escape
+     filenames   list of template filenames (where '-' means use stdin)
+     vararg      list of variable names and values
+     unescape:   if True, replace '\%' in the templates by '%'
    """
    
    assert(isinstance(filenames,list))
    assert(isinstance(vararg,list))
-   assert(isinstance(escape,bool))
+   assert(isinstance(unescape,bool))
 
    # Collect values for each variable from the command line.
    values  = collections.defaultdict(list)
@@ -122,7 +123,7 @@ def main(filenames, vararg, escape=False):
          if len(re.split(r'(\s+)', arg))==1:
             varname = arg
          else:
-            print "catsub error - '"+arg+"' is not a valid variable name."
+            print("catsub error - '"+arg+"' is not a valid variable name.")
             sys.exit(1)
       else:
          # Ensure repeated substitution does not occur by escaping
@@ -141,15 +142,15 @@ def main(filenames, vararg, escape=False):
          try:
             f = open(filename, 'r')
          except:
-            print "catsub error - could not open file '" + filename + "'."
+            print("catsub error - could not open file '" + filename + "'.")
             sys.exit(1)
       # Process each line in the file and make substitutions in each word
       try:
          for line in f:
-            if escape:
-               line = line.replace('\\%','\\'+escaped_percentage_sign)
-            else:
+            if unescape:
                line = line.replace('\\%',escaped_percentage_sign)
+            else:
+               line = line.replace('\\%','\\'+escaped_percentage_sign)
             words = re.split(r'(\s+)', line)
             for wordidx in range(len(words)):
                for varname in sorted(values.keys(),reverse=True):#values:
@@ -163,26 +164,37 @@ def main(filenames, vararg, escape=False):
             print replacedline.replace(escaped_percentage_sign,'%'),
       except:
          # Reading file or processing went wrong
-         print "catsub error - could not process file '" + filename + "'."
+         print("catsub error - could not process file '" + filename + "'.")
          sys.exit(1)
-      if filename != '-': f.close()
+      if filename != '-':
+         f.close()
 
 ## Start of application ##
 
 if __name__ == "__main__":
 
    # Parse the arguments and pass to main
-   if len(sys.argv)==1:
-      main([], [])
-   elif sys.argv[1] in ['-h','--help']:
-      print_help()
-   elif sys.argv[1] in ['-e','--escape']:
-      if sys.argv[2][0]=='%':
-         main([], sys.argv[2:], escape=True)
+   filestart = 1
+   varstart  = 1
+   unescape  = False
+   readopts  = True   # start reading option
+   for i in range(1,len(sys.argv)):
+      if readopts and sys.argv[i][0] == '-':
+         if sys.argv[i] == '--help':
+            print_help()
+            sys.exit(0)
+         elif sys.argv[i] == '-u':
+            unescape=True
+         else:
+            print("catsub error - unknown option '" + sys.argv[i] + "'.")
+            sys.exit(1)
+         filestart = i + 1
+         varstart  = i + 1
       else:
-         main([sys.argv[2]], sys.argv[3:], escape=True)
-   else:
-      if sys.argv[1][0]=='%':
-         main([], sys.argv[1:], escape=False)
-      else:
-         main([sys.argv[1]], sys.argv[2:], escape=False)
+         optionson = False
+         if sys.argv[i][0] == '%':
+            varstart = i
+            break
+         else:
+            varstart = i+1
+   main(sys.argv[filestart:varstart], sys.argv[varstart:], unescape=unescape)

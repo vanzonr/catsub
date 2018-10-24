@@ -6,22 +6,22 @@ template file.
 
 ## Usage:
 
-    catsub [-h] [-e] [TEMPLATEFILE] [%VARNAME VALUE1 VALUE2 ... ]*
+    catsub [-h] [-e] [TEMPLATEFILES] [%VARNAME VALUE1 VALUE2 ... ]*
 
 Arguments:
 
-     TEMPLATEFILE      Name of a file containg the template with
+     TEMPLATEFILES     Name(s) of file(s) containg the template with
                        variables of the from %VARNAME; If no file name
                        is given, or the name is '-', catsub will read
                        from standard input;
      %VARNAME          Variable name to substitute;
      VALUE1 VALUE2 ... Values to substitute for the variable;
-     -e, --escape      Escaped percentage in template are returned escaped;
-     -h, --help        Show this help page.
+     -u                Escaped percentage in template are returned unescaped;
+     --help            Show this help page.
 
 ## Prerequisites
 
-  -  Python 2.5+
+  -  Python 2.4+
 
 ## Installation
 
@@ -29,7 +29,7 @@ Simply copy the script to a location in the PATH.
 
 ## Notes
 
-   - The name of the TEMPLATEFILE may not start with a percent sign.  
+   - The names of the template files may not start with a percent sign.  
 
    - All variables must start with a percent sign and cannot contain
      whitespace.
