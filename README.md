@@ -39,9 +39,9 @@ Simply copy the script to a location in the PATH.
    - Substitution happens only once per variable, i.e., substituted
      values do not undergo subsequent substitutions.
 
-   - When a variable has been given several values to substitute ad
+   - When a variable has been given several values to substitute and
      the variable occurs in a substring of a word in the template,
-     that word get repeated. E.g. "echo un%X | catsub %X kind tidy"
+     that word gets repeated. E.g. "echo un%X | catsub %X kind tidy"
      gives "unkind untidy"
 
    - Substitution happens combinatorically within a word. E.g. a word
@@ -55,6 +55,11 @@ Simply copy the script to a location in the PATH.
      if values for both are specified on the catsub command, but it is
      the longer %HELLOWORLD that gets used.
    
+   - Unresolved variables that occur in the template but are not
+     mentioned in the variable list, remain in the result.  To replace
+     them with empty strings, you must explicitly add empty value for
+     them, e.g. "catsub %HELLO ''".
+
    - Percentage signs in the template can escape substitution by
      prepeding them with a slash, i.e., '\%'.  Every '\%' in the
      template will be replaced by '%' unless the -e or --escape
