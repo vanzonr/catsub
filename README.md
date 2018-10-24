@@ -82,7 +82,7 @@ The following examples work when called from a Linux shell (e.g. bash).
      $ ./catsub example.tmpl %HELLO Greetings %UNIVERSE universe!
      Greetings universe!
      $ ./catsub example.tmpl %HELLO Greetings %UNI Uni
-     Greetings Universe
+     Greetings UniVERSE
      $ ./catsub example.tmpl %HELLO Greetings %UNI Uni %UNIVERSE world!
      Greetings world!
 
