@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 #
 
-
 import sys
 import re
 import collections
@@ -89,15 +88,15 @@ def print_help():
 
    Examples:
 
-     $ echo %HELLO %UNIVERSE | """+sys.argv[0]+""" %HELLO Hi %UNIVERSE world
+     $ echo %HELLO %UNIVERSE | catsub %HELLO Hi %UNIVERSE world
      Hi world
 
      $ echo %HELLO %UNIVERSE > example.tmpl
-     $ """+sys.argv[0]+""" example.tmpl %HELLO Greetings %UNIVERSE universe!
+     $ catsub example.tmpl %HELLO Greetings %UNIVERSE universe!
      Greetings universe!
 """)
 
-def main(filename, vararg, escape=False):
+def main(filenames, vararg, escape=False):
 
    """
    Process the template in filename, given the argument list with
@@ -111,22 +110,11 @@ def main(filename, vararg, escape=False):
      escape
    """
    
-   assert(isinstance(filename,str))
+   assert(isinstance(filenames,list))
    assert(isinstance(vararg,list))
    assert(isinstance(escape,bool))
 
-   # open file or use standard in
-   if filename == '-':
-      f = sys.stdin
-   else:
-      try:
-         f = open(filename, 'r')
-      except:
-         print sys.argv[0]+" error - could not open file '" + filename + "'."
-         sys.exit(1)
-
    # Collect values for each variable from the command line.
-
    values  = collections.defaultdict(list)
    varname = '%DEFAULT'
    for arg in vararg:
@@ -134,56 +122,67 @@ def main(filename, vararg, escape=False):
          if len(re.split(r'(\s+)', arg))==1:
             varname = arg
          else:
-            print sys.argv[0]+" error - '"+arg+"' is not a valid variable name."
+            print "catsub error - '"+arg+"' is not a valid variable name."
             sys.exit(1)
-
       else:
          # Ensure repeated substitution does not occur by escaping
          # percentage signs
          values[varname].append(arg.replace('%',escaped_percentage_sign))
 
-   # Process each line in the file and make substitutions in each word
+   # if no files given, read from stdin, signaled by '-' as a filename
+   if filenames == []:
+      filenames = ['-']
 
-   try:
+   for filename in filenames:
+      # open file or use standard in
+      if filename == '-':
+         f = sys.stdin
+      else:
+         try:
+            f = open(filename, 'r')
+         except:
+            print "catsub error - could not open file '" + filename + "'."
+            sys.exit(1)
+      # Process each line in the file and make substitutions in each word
+      try:
+         for line in f:
+            if escape:
+               line = line.replace('\\%','\\'+escaped_percentage_sign)
+            else:
+               line = line.replace('\\%',escaped_percentage_sign)
+            words = re.split(r'(\s+)', line)
+            for wordidx in range(len(words)):
+               for varname in sorted(values.keys(),reverse=True):#values:
+                  if varname in words[wordidx]:
+                     replacements = []
+                     for value in values[varname]:
+                        replacements.append(words[wordidx].replace(varname,value))
+                     words[wordidx] = ' '.join(replacements)
+            replacedline = ''.join(words)
+            # Undo escaping of percentage sign
+            print replacedline.replace(escaped_percentage_sign,'%'),
+      except:
+         # Reading file or processing went wrong
+         print "catsub error - could not process file '" + filename + "'."
+         sys.exit(1)
+      if filename != '-': f.close()
 
-      for line in f:
-         if escape:
-            line = line.replace('\\%','\\'+escaped_percentage_sign)
-         else:
-            line = line.replace('\\%',escaped_percentage_sign)
-         words = re.split(r'(\s+)', line)
-         for wordidx in range(len(words)):
-            for varname in sorted(values.keys(),reverse=True):#values:
-               if varname in words[wordidx]:
-                  replacements = []
-                  for value in values[varname]:
-                     replacements.append(words[wordidx].replace(varname,value))
-                  words[wordidx] = ' '.join(replacements)
-         replacedline = ''.join(words)
-         # Undo escaping of percentage sign
-         print replacedline.replace(escaped_percentage_sign,'%'),
-
-   except:
-
-      # Reading file or processing went wrong
-      print sys.argv[0]+" error - could not process file '" + filename + "'."
-      sys.exit(1)
+## Start of application ##
 
 if __name__ == "__main__":
 
-   # Parse the arguments
-
+   # Parse the arguments and pass to main
    if len(sys.argv)==1:
-      main('-', [])
+      main([], [])
    elif sys.argv[1] in ['-h','--help']:
       print_help()
    elif sys.argv[1] in ['-e','--escape']:
       if sys.argv[2][0]=='%':
-         main('-', sys.argv[2:], escape=True)
+         main([], sys.argv[2:], escape=True)
       else:
-         main(sys.argv[2], sys.argv[3:], escape=True)
+         main([sys.argv[2]], sys.argv[3:], escape=True)
    else:
       if sys.argv[1][0]=='%':
-         main('-', sys.argv[1:], escape=False)
+         main([], sys.argv[1:], escape=False)
       else:
-         main(sys.argv[1], sys.argv[2:], escape=False)
+         main([sys.argv[1]], sys.argv[2:], escape=False)
