@@ -6,7 +6,7 @@ template file.
 
 ## Usage:
 
-    catsub [--help] [-u] [TEMPLATEFILES] [%VARNAME VALUE1 VALUE2 ... ]*
+    catsub [--help] [-s] [-u] [TEMPLATEFILES] [%VARNAME VALUE1 VALUE2 ... ]*
 
 Arguments:
 
@@ -16,6 +16,7 @@ Arguments:
                        from standard input;
      %VARNAME          Variable name to substitute;
      VALUE1 VALUE2 ... Values to substitute for the variable;
+     -s                Print statistics to stderr on resolved and unresolved variables.
      -u                Escaped percentage in template are returned unescaped;
      --help            Show this help page.
 
