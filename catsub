@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 # catsub - little substitutor
@@ -24,11 +24,12 @@
 # THE SOFTWARE.
 #
 
+from __future__ import print_function
 import sys
 import re
 import collections
 
-escaped_percentage_sign="％"  # abusing unicode character to escape '%'
+escaped_percentage_sign=u"％"  # abusing unicode character to escape '%'
 
 def print_help():
    """print help message for the catsub command"""
@@ -173,7 +174,7 @@ def main(filenames, vararg, unescape=False, reportstats=False):
                      words[wordidx] = ' '.join(replacements)
             replacedline = ''.join(words)
             # Undo escaping of percentage sign
-            print replacedline.replace(escaped_percentage_sign,'%'),
+            print(replacedline.replace(escaped_percentage_sign,'%'),end='')
       except:
          # Reading file or processing went wrong
          print("catsub error - could not process file '" + filename + "'.")
@@ -182,19 +183,19 @@ def main(filenames, vararg, unescape=False, reportstats=False):
          f.close()
    if reportstats:
       if len(values)!=len(usedvars):
-         print  >> sys.stderr, ("Unused variables:")
+         print("Unused variables:", file=sys.stderr)
          for word in values.keys():
             if not word[1:] in usedvars:
-               print >> sys.stderr, word
+               print(word, file=sys.stderr)
       if len(usedvars)>0:
-         print  >> sys.stderr, ("Substituted variables:")
+         print("Substituted variables:", file=sys.stderr)
          for word in usedvars:
-            print >> sys.stderr, ('%'+word)
+            print('%'+word, file=sys.stderr)
       if len(allvars) != len(usedvars):
-         print  >> sys.stderr, ("Unsubstituted variables present in template:")
+         print("Unsubstituted variables present in template:", file=sys.stderr)
          for word in allvars:
             if not word in usedvars:
-               print >> sys.stderr, ('%'+word)
+               print('%'+word, file=sys.stderr)
 
 ## Start of application ##
 
