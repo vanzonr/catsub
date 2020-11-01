@@ -6,7 +6,7 @@ template file.
 
 ## Usage:
 
-    catsub [--help] [-s] [-u] [TEMPLATEFILES] [%VARNAME VALUE1 VALUE2 ... ]*
+    catsub [--help] [-s] [-u] [-D|-dSTR] [TEMPLATEFILES] [%VARNAME VALUE1 VALUE2 ... ]*
 
 Arguments:
 
@@ -18,6 +18,8 @@ Arguments:
      VALUE1 VALUE2 ... Values to substitute for the variable;
      -s                Print statistics to stderr on resolved and unresolved variables.
      -u                Escaped percentage in template are returned unescaped;
+     -D                Use newline to divide multiple substituted values
+     -dSTR             Use STR to divide multiple substituted values
      --help            Show this help page.
 
 ## Prerequisites
