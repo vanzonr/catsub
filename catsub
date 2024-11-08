@@ -34,7 +34,7 @@ escaped_percentage_sign=u"％"  # abusing unicode character to escape '%'
 def print_help():
    """print help message for the catsub command"""
    
-   print("""
+   print(r"""
    catsub - substitutes every value for each variable in each word of a template file.
 
    Usage:
@@ -106,7 +106,7 @@ def print_help():
 
 def main(filenames, vararg, unescape=False, reportstats=False, multisep=' '):
 
-   """
+   r"""
    Process the template in filename, given the argument list with
    variable definitions in vararg, possibly resolving escaped
    percentages intact.
