@@ -15,7 +15,9 @@ Arguments:
                        is given, or the name is '-', catsub will read
                        from standard input;
      %VARNAME          Variable name to substitute;
-     VALUE1 VALUE2 ... Values to substitute for the variable;
+     VALUE1 VALUE2 ... Values to substitute for the variable. A value
+                       may also be specified as @file:PATH, in which case
+                       each line in PATH is treated as one substitution value;
      -s                Print statistics to stderr on resolved and unresolved variables.
      -u                Escaped percentage in template are returned unescaped;
      -D                Use newline to divide multiple substituted values
@@ -39,6 +41,9 @@ Simply copy the script to a location in the PATH.
      whitespace.
 
    - Substituted values cannot start with a percent sign.
+
+   - Values may be loaded from a file using @file:PATH; each line in the
+     file becomes one substitution value.
 
    - Substitution happens only once per variable, i.e., substituted
      values do not undergo subsequent substitutions.
@@ -81,6 +86,10 @@ The following examples work when called from a Linux shell (e.g. bash).
 
      $ echo %X,%Y | catsub %X 'a b' %Y 'c d'
      a b,c d
+
+     $ printf '%s\n' red blue > values.txt
+     $ echo %X | ./catsub %X @file:values.txt
+     red blue
      
      $ echo %HELLO %UNIVERSE > example.tmpl
      $ ./catsub example.tmpl %HELLO Greetings %UNIVERSE universe!

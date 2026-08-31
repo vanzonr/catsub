@@ -48,7 +48,9 @@ def print_help():
                        is given, or the name is '-', catsub will read
                        from standard input;
      %VARNAME          Variable name to substitute;
-     VALUE1 VALUE2 ... Values to substitute for the variable;
+     VALUE1 VALUE2 ... Values to substitute for the variable. A value may
+                       also be given as @file:PATH, in which case each line
+                       in PATH is appended as one substitution value;
      -s                Print statistics to stderr on resolved and unresolved variables.
      -u                Escaped percentage in template are returned unescaped;
      -dSTR             Use STR to divide multiple substituted values
@@ -63,6 +65,9 @@ def print_help():
      whitespace.
 
    - Substituted values cannot start with a percent sign.
+
+   - Values may be loaded from a file with @file:PATH; each line in the
+     file is treated as one substitution value.
 
    - Substitution happens only once per variable, i.e., substituted
      values do not undergo subsequent substitutions.
@@ -136,7 +141,18 @@ def main(filenames, vararg, unescape=False, reportstats=False, multisep=' '):
       else:
          # Ensure repeated substitution does not occur by escaping
          # percentage signs
-         values[varname].append(arg.replace('%',escaped_percentage_sign))
+         fileoption='@file:'
+         if arg.startswith(fileoption):
+            filename = arg[len(fileoption):]
+            try:
+               with open(filename,'r') as f:
+                  for line in f:
+                     values[varname].append(line.rstrip('\n').replace('%',escaped_percentage_sign))
+            except:
+               print("catsub error - could not open file '" + filename + "'.", file=sys.stderr)
+               sys.exit(1)
+         else:
+            values[varname].append(arg.replace('%',escaped_percentage_sign))
 
    # if no files given, read from stdin, signaled by '-' as a filename
    if filenames == []:
