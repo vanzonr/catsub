@@ -34,7 +34,7 @@ Simply copy the script to a location in the PATH.
 
 ## Testing
 
-The repository includes a small bash smoke test suite in test.sh.
+The repository includes a small bash test suite in test.sh.
 It exercises typical substitutions, error cases, and the @file: trust policy
 so regressions are caught quickly.
 
