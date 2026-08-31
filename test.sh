@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copyright (c) 2018-2026 Ramses van Zon
 
 set -u
 
