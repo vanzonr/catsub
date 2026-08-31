@@ -112,7 +112,11 @@ check_contains "stats report unsubstituted var" "%Y" "$stderr"
 help_output="$($BIN --help 2>&1)"
 check_contains "help output" "Usage:" "$help_output"
 
-# 20. invalid option exits non-zero
+# 20. -h is equivalent to --help
+help_short_output="$($BIN -h 2>&1)"
+check_contains "short help output" "Usage:" "$help_short_output"
+
+# 21. invalid option exits non-zero
 expect_fail "invalid option" bash -c "\"$BIN\" --bad-option"
 
 echo "All tests passed."
