@@ -31,6 +31,15 @@ check_contains() {
   echo "PASS: $name"
 }
 
+expect_fail() {
+  local name="$1"
+  shift
+  if "$@" >/dev/null 2>&1; then
+    fail "$name" "non-zero exit" "zero exit"
+  fi
+  echo "PASS: $name"
+}
+
 # 1. basic substitution
 check_eq "basic substitution" "Hi world" "$(echo '%HELLO %UNIVERSE' | "$BIN" %HELLO Hi %UNIVERSE world)"
 
@@ -58,29 +67,51 @@ check_eq "longest variable wins" "bar foo" "$(echo '%HELLOWORLD %HELLO' | "$BIN"
 # 9. reads template from a file
 check_eq "file template" "a b" "$(tmpfile=$(mktemp) && printf '%s\n' '%X %Y' > "$tmpfile" && "$BIN" "$tmpfile" %X a %Y b && rm -f "$tmpfile")"
 
-# 10. reads substitution values from a file, one per line
-check_eq "file substitution values" "red blue" "$(values_file=$(mktemp) && printf '%s\n' 'red' 'blue' > "$values_file" && echo '%X' | "$BIN" %X @file:"$values_file" && rm -f "$values_file")"
+# 10. reads substitution values from a file, one per line, when it is inside the current directory
+check_eq "file substitution values" "red blue" "$(values_file=$(mktemp "${PWD}/catsub-values.XXXXXX") && printf '%s\n' 'red' 'blue' > "$values_file" && echo '%X' | "$BIN" %X @file:"$values_file" && rm -f "$values_file")"
 
-# 11. multiple values with quoting preserve spaces
-check_eq "quoted values" "a b,c d" "$(echo '%X,%Y' | "$BIN" %X 'a b' %Y 'c d')"
-
-# 12. a missing @file source should fail clearly
-if echo '%X' | "$BIN" %X @file:/no/such/file >/dev/null 2>&1; then
-  fail "missing @file source" "non-zero exit" "zero exit"
+# 11. accepts a user-owned file in /tmp, if /tmp exists
+if [[ -d /tmp ]]; then
+  check_eq "tmp file source" "alpha beta" "$(tmpfile=$(mktemp /tmp/catsub-values.XXXXXX) && printf '%s\n' 'alpha' 'beta' > "$tmpfile" && echo '%X' | "$BIN" %X @file:"$tmpfile" && rm -f "$tmpfile")"
+else
+  echo "WARNING: /tmp does not exist; skipping tmp file source test." >&2
 fi
 
-# 13. stats report unused variables on stderr
+# 12. accepts a user-owned file in /dev/shm, if /dev/shm exists
+if [[ -d /dev/shm ]]; then
+  check_eq "dev-shm file source" "gamma delta" "$(tmpfile=$(mktemp /dev/shm/catsub-values.XXXXXX) && printf '%s\n' 'gamma' 'delta' > "$tmpfile" && echo '%X' | "$BIN" %X @file:"$tmpfile" && rm -f "$tmpfile")"
+else
+  echo "WARNING: /dev/shm does not exist; skipping dev-shm file source test." >&2
+fi
+
+# 13. uses a template directory as an allowed source root
+check_eq "template-dir file source" "alpha beta" "$(tmpdir=$(mktemp -d) && printf '%s\n' 'alpha' 'beta' > "$tmpdir/vals.txt" && printf '%s\n' '%X' > "$tmpdir/tmpl.txt" && "$BIN" "$tmpdir/tmpl.txt" %X @file:"$tmpdir/vals.txt" && rm -rf "$tmpdir")"
+
+# 14. multiple values with quoting preserve spaces
+check_eq "quoted values" "a b,c d" "$(echo '%X,%Y' | "$BIN" %X 'a b' %Y 'c d')"
+
+# 14. a missing @file source should fail clearly
+expect_fail "missing @file source" bash -c "echo '%X' | \"$BIN\" %X @file:/no/such/file"
+
+# 15. an empty @file target should fail clearly
+expect_fail "empty @file target" bash -c "echo '%X' | \"$BIN\" %X @file:"
+
+# 16. a directory is not accepted as a @file source
+expect_fail "directory @file source" bash -c "echo '%X' | \"$BIN\" %X @file:$(mktemp -d)"
+
+# 17. a file outside the allowed directories is rejected
+expect_fail "outside-worktree @file source" bash -c "echo '%X' | \"$BIN\" %X @file:/etc/hosts"
+
+# 18. stats report unused variables on stderr
 stderr="$(echo '%X %Y' | "$BIN" -s %X a %Z b 2>&1 >/dev/null)"
 check_contains "stats report unused var" "%Z" "$stderr"
 check_contains "stats report unsubstituted var" "%Y" "$stderr"
 
-# 14. help exits successfully and mentions usage
+# 19. help exits successfully and mentions usage
 help_output="$($BIN --help 2>&1)"
 check_contains "help output" "Usage:" "$help_output"
 
-# 15. invalid option exits non-zero
-if "$BIN" --bad-option >/dev/null 2>&1; then
-  fail "bad option" "non-zero exit" "zero exit"
-fi
+# 20. invalid option exits non-zero
+expect_fail "invalid option" bash -c "\"$BIN\" --bad-option"
 
 echo "All tests passed."

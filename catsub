@@ -28,6 +28,7 @@ from __future__ import print_function
 import sys
 import re
 import collections
+import os
 
 escaped_percentage_sign=u"％"  # abusing unicode character to escape '%'
 
@@ -69,6 +70,10 @@ def print_help():
    - Values may be loaded from a file with @file:PATH; each line in the
      file is treated as one substitution value.
 
+   - @file: sources are restricted to the current working directory,
+     one of the (sub) directories in which the template files reside,
+     or a user-owned /tmp or /dev/shm file.
+
    - Substitution happens only once per variable, i.e., substituted
      values do not undergo subsequent substitutions.
 
@@ -109,6 +114,30 @@ def print_help():
      Greetings universe!
 """)
 
+def is_allowed_path(path, allowed_dirs):
+   """Return True if path resolves inside an allowed directory or a trusted tmp dir owned by the user."""
+   realpath = os.path.realpath(path)
+   for allow in allowed_dirs:
+      allow = os.path.realpath(allow)
+      if realpath == allow:
+         return True
+      if allow == os.path.sep:
+         return True
+      if realpath.startswith(allow + os.sep):
+         return True
+
+   # /tmp and /dev/shm are trusted only for files owned by the current user.
+   for trusted in ['/tmp', '/dev/shm']:
+      trusted = os.path.realpath(trusted)
+      if realpath == trusted or realpath.startswith(trusted + os.sep):
+         try:
+            if os.stat(path).st_uid == os.getuid():
+               return True
+         except OSError:
+            return False
+   return False
+
+
 def main(filenames, vararg, unescape=False, reportstats=False, multisep=' '):
 
    r"""
@@ -131,6 +160,11 @@ def main(filenames, vararg, unescape=False, reportstats=False, multisep=' '):
    # Collect values for each variable from the command line.
    values  = collections.defaultdict(list)
    varname = '%DEFAULT'
+   allowed_dirs = [os.getcwd()]
+   for filename in filenames:
+      if filename != '-' and filename != '':
+         allowed_dirs.append(os.path.dirname(os.path.abspath(filename)))
+
    for arg in vararg:
       if len(arg)>0 and arg[0] == '%':
          if len(re.split(r'(\s+)', arg))==1:
@@ -144,11 +178,21 @@ def main(filenames, vararg, unescape=False, reportstats=False, multisep=' '):
          fileoption='@file:'
          if arg.startswith(fileoption):
             filename = arg[len(fileoption):]
+            if filename == '':
+               print("catsub error - empty file name in '@file:' value.", file=sys.stderr)
+               sys.exit(1)
+            if not is_allowed_path(filename, allowed_dirs):
+               print("catsub error - file '" + filename + "' is outside the allowed directories.", file=sys.stderr)
+               sys.exit(1)
             try:
+               if not os.path.isfile(filename):
+                  raise IOError
+               if not os.access(filename, os.R_OK):
+                  raise PermissionError
                with open(filename,'r') as f:
                   for line in f:
-                     values[varname].append(line.rstrip('\n').replace('%',escaped_percentage_sign))
-            except:
+                     values[varname].append(line.rstrip('\r\n').replace('%',escaped_percentage_sign))
+            except (IOError, OSError):
                print("catsub error - could not open file '" + filename + "'.", file=sys.stderr)
                sys.exit(1)
          else:

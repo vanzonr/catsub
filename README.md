@@ -45,6 +45,10 @@ Simply copy the script to a location in the PATH.
    - Values may be loaded from a file using @file:PATH; each line in the
      file becomes one substitution value.
 
+   - @file: sources are restricted to the current working directory,
+     one of the (sub) directories in which the template files reside,
+     or a user-owned /tmp or /dev/shm file.
+
    - Substitution happens only once per variable, i.e., substituted
      values do not undergo subsequent substitutions.
 
