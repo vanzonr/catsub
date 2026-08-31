@@ -40,7 +40,7 @@ def print_help():
 
    Usage:
 
-     catsub [--help] [-s] [-u] [-D|-dSTR] [TEMPLATEFILES] [%VARNAME VALUE1 VALUE2 ... ]*
+     catsub [--help|-h] [-s] [-u] [-D|-dSTR] [TEMPLATEFILES] [%VARNAME VAL1 VAL2 ... ]*
 
    Arguments:
 
@@ -49,7 +49,7 @@ def print_help():
                        is given, or the name is '-', catsub will read
                        from standard input;
      %VARNAME          Variable name to substitute;
-     VALUE1 VALUE2 ... Values to substitute for the variable. A value may
+     VAL1 VAL2 ...     Values to substitute for the variable. A value may
                        also be given as @file:PATH, in which case each line
                        in PATH is appended as one substitution value;
      -s                Print statistics to stderr on resolved and unresolved variables.
