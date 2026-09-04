@@ -29,6 +29,7 @@ import sys
 import re
 import collections
 import os
+import string
 
 escaped_percentage_sign=u"％"  # abusing unicode character to escape '%'
 
@@ -257,11 +258,11 @@ def main(filenames, vararg, unescape=False, reportstats=False, multisep=' '):
          print("Substituted variables:", file=sys.stderr)
          for word in usedvars:
             print('%'+word, file=sys.stderr)
-      if len(allvars) != len(usedvars):
+      unsubstitutedvars = [var for var in allvars if not any(var.startswith(used) for used in usedvars) and not all(c in string.punctuation for c in var)]
+      if len(unsubstitutedvars) > 0:
          print("Unsubstituted variables present in template:", file=sys.stderr)
-         for word in allvars:
-            if not word in usedvars:
-               print('%'+word, file=sys.stderr)
+         for word in unsubstitutedvars:
+            print('%'+word, file=sys.stderr)
 
 ## Start of application ##
 
