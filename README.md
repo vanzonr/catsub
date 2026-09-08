@@ -6,7 +6,7 @@ template file.
 
 ## Usage:
 
-    catsub [--help] [-s] [-u] [-D|-dSTR] [TEMPLATEFILES] [%VARNAME VALUE1 VALUE2 ... ]*
+    catsub [--help] [-s] [-u] [-E] [-D|-dSTR] [TEMPLATEFILES] [%VARNAME VALUE1 VALUE2 ... ]*
 
 Arguments:
 
@@ -20,6 +20,7 @@ Arguments:
                        each line in PATH is treated as one substitution value;
      -s                Print statistics to stderr on resolved and unresolved variables.
      -u                Escaped percentage in template are returned unescaped;
+      -E                Split whitespace-separated values imported with %@file:PATH;
      -D                Use newline to divide multiple substituted values
      -dSTR             Use STR to divide multiple substituted values
      --help            Show this help page.
@@ -51,6 +52,10 @@ so regressions are caught quickly.
 
    - Values may be loaded from a file using @file:PATH; each line in the
      file becomes one substitution value.
+
+   - Values may also be imported as command-line arguments using %@file:PATH;
+     each non-empty line becomes one value. Use -E to split those lines on
+     whitespace instead.
 
    - @file: sources are restricted to the current working directory,
      one of the (sub) directories in which the template files reside,

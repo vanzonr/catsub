@@ -52,7 +52,7 @@ def print_help():
 
    Usage:
 
-     catsub [--help|-h] [-s] [-u] [-D|-dSTR] [TEMPLATEFILES] [%VARNAME VAL1 VAL2 ... ]*
+       catsub [--help|-h] [-s] [-u] [-E] [-D|-dSTR] [TEMPLATEFILES] [%VARNAME VAL1 VAL2 ... ]*
 
    Arguments:
 
@@ -66,6 +66,7 @@ def print_help():
                        in PATH is appended as one substitution value;
      -s                Print statistics to stderr on resolved and unresolved variables.
      -u                Escaped percentage in template are returned unescaped;
+       -E                Split whitespace-separated values imported with %@file:PATH;
      -dSTR             Use STR to divide multiple substituted values
      -D                Use newline to divide multiple substituted values
      --help            Show this help page.
@@ -152,6 +153,41 @@ def is_allowed_path(path, allowed_dirs):
          except OSError:
             return False
    return False
+
+
+def allow_file_import(vararg, split_lines=False):
+   r"""
+   Process the vararg list and allow values to be imported from files with %@file:PATH.
+   Return a new vararg list with the %@file:PATH replaced by the contents of the file.
+   """
+   newvararg=[]
+   for arg in vararg:
+      if arg.startswith('%@file:'):
+         filename = arg[len('%@file:'):]
+         if filename == '':
+            print("catsub error - empty file name in '@file:' value.", file=sys.stderr)
+            sys.exit(1)
+         if not is_allowed_path(filename, [os.getcwd()]):
+            print("catsub error - file '" + filename + "' is outside the allowed directories.", file=sys.stderr)
+            sys.exit(1)
+         try:
+            if not os.path.isfile(filename):
+               raise IOError
+            if not os.access(filename, os.R_OK):
+               raise IOError
+            with open(filename,'r') as f:
+               for line in f:
+                  value = line.rstrip('\r\n')
+                  if split_lines:
+                     newvararg.extend(value.split())
+                  elif value != '':
+                     newvararg.append(value)
+         except (IOError, OSError):
+            print("catsub error - could not open file '" + filename + "'.", file=sys.stderr)
+            sys.exit(1)
+      else:
+         newvararg.append(arg)
+   return newvararg
 
 
 def main(filenames, vararg, unescape=False, reportstats=False, multisep=' '):
@@ -292,6 +328,7 @@ if __name__ == "__main__":
    filestart   = 1
    varstart    = 1
    unescape    = False
+   split_file_import = False
    reportstats = False
    multisep    = ' '
    readopts  = True   # start reading option
@@ -302,6 +339,8 @@ if __name__ == "__main__":
             sys.exit(0)
          elif sys.argv[i] == '-u':
             unescape=True
+         elif sys.argv[i] == '-E':
+            split_file_import=True
          elif sys.argv[i] == '-s':
             reportstats=True
          elif sys.argv[i] == '-D':
@@ -320,4 +359,6 @@ if __name__ == "__main__":
             break
          else:
             varstart = i+1
-   main(sys.argv[filestart:varstart], sys.argv[varstart:], unescape=unescape, reportstats=reportstats,multisep=multisep)
+   file_list = sys.argv[filestart:varstart]
+   subs_list = allow_file_import(sys.argv[varstart:], split_lines=split_file_import)
+   main(file_list, subs_list, unescape=unescape, reportstats=reportstats,multisep=multisep)

@@ -88,6 +88,24 @@ fi
 # 13. uses a template directory as an allowed source root
 check_eq "template-dir file source" "alpha beta" "$(tmpdir=$(mktemp -d) && printf '%s\n' 'alpha' 'beta' > "$tmpdir/vals.txt" && printf '%s\n' '%X' > "$tmpdir/tmpl.txt" && "$BIN" "$tmpdir/tmpl.txt" %X @file:"$tmpdir/vals.txt" && rm -rf "$tmpdir")"
 
+# 14. percent-prefixed file imports accept user-owned files in /tmp
+if [[ -d /tmp ]]; then
+  check_eq "percent file import from tmp" "alpha beta" "$(tmpfile=$(mktemp /tmp/catsub-percent-values.XXXXXX) && printf '%s\n' 'alpha' 'beta' > "$tmpfile" && echo '%X' | "$BIN" %X %@file:"$tmpfile" && rm -f "$tmpfile")"
+  check_eq "percent file import preserves spaces" "alpha beta" "$(tmpfile=$(mktemp /tmp/catsub-percent-values.XXXXXX) && printf '%s\n' 'alpha beta' > "$tmpfile" && echo '%X' | "$BIN" -d, %X %@file:"$tmpfile" && rm -f "$tmpfile")"
+  check_eq "percent file import preserves lines" "alpha beta,gamma delta" "$(tmpfile=$(mktemp /tmp/catsub-percent-values.XXXXXX) && printf '%s\n' 'alpha beta' 'gamma delta' > "$tmpfile" && echo '%X' | "$BIN" -d, %X %@file:"$tmpfile" && rm -f "$tmpfile")"
+  check_eq "percent file import splits with -E" "alpha,beta" "$(tmpfile=$(mktemp /tmp/catsub-percent-values.XXXXXX) && printf '%s\n' 'alpha beta' > "$tmpfile" && echo '%X' | "$BIN" -E -d, %X %@file:"$tmpfile" && rm -f "$tmpfile")"
+  check_eq "percent file import splits lines with -E" "alpha,beta,gamma,delta" "$(tmpfile=$(mktemp /tmp/catsub-percent-values.XXXXXX) && printf '%s\n' 'alpha beta' 'gamma delta' > "$tmpfile" && echo '%X' | "$BIN" -E -d, %X %@file:"$tmpfile" && rm -f "$tmpfile")"
+else
+  echo "WARNING: /tmp does not exist; skipping percent file import test." >&2
+fi
+
+# 15. percent-prefixed file imports accept user-owned files in /dev/shm
+if [[ -d /dev/shm ]]; then
+  check_eq "percent file import from dev-shm" "gamma delta" "$(tmpfile=$(mktemp /dev/shm/catsub-percent-values.XXXXXX) && printf '%s\n' 'gamma' 'delta' > "$tmpfile" && echo '%X' | "$BIN" %X %@file:"$tmpfile" && rm -f "$tmpfile")"
+else
+  echo "WARNING: /dev/shm does not exist; skipping percent file import test." >&2
+fi
+
 # 14. multiple values with quoting preserve spaces
 check_eq "quoted values" "a b,c d" "$(echo '%X,%Y' | "$BIN" %X 'a b' %Y 'c d')"
 
