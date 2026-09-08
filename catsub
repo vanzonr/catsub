@@ -117,6 +117,10 @@ def print_help():
 
 def is_allowed_path(path, allowed_dirs):
    """Return True if path resolves inside an allowed directory or a trusted tmp dir owned by the user."""
+
+   assert(isinstance(path,str))
+   assert(isinstance(allowed_dirs,list))
+
    realpath = os.path.realpath(path)
    for allow in allowed_dirs:
       allow = os.path.realpath(allow)
@@ -157,6 +161,8 @@ def main(filenames, vararg, unescape=False, reportstats=False, multisep=' '):
    assert(isinstance(filenames,list))
    assert(isinstance(vararg,list))
    assert(isinstance(unescape,bool))
+   assert(isinstance(reportstats,bool))
+   assert(isinstance(multisep,str))
 
    # Collect values for each variable from the command line.
    values  = collections.defaultdict(list)
@@ -189,7 +195,7 @@ def main(filenames, vararg, unescape=False, reportstats=False, multisep=' '):
                if not os.path.isfile(filename):
                   raise IOError
                if not os.access(filename, os.R_OK):
-                  raise PermissionError
+                  raise IOError
                with open(filename,'r') as f:
                   for line in f:
                      values[varname].append(line.rstrip('\r\n').replace('%',escaped_percentage_sign))

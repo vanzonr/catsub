@@ -26,7 +26,7 @@ Arguments:
 
 ## Prerequisites
 
-  -  Python 2.4+
+  -  Python 2.6+
 
 ## Installation
 
