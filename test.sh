@@ -119,4 +119,23 @@ check_contains "short help output" "Usage:" "$help_short_output"
 # 21. invalid option exits non-zero
 expect_fail "invalid option" bash -c "\"$BIN\" --bad-option"
 
+if command -v python2 >/dev/null 2>&1; then
+  unicode_value="$(printf '\303\251')"
+  unicode_error="catsub does not support unicode when used with python version < 3."
+
+  # 22. Python 2 rejects non-ASCII command-line values clearly
+  if stderr="$(LC_ALL=C.UTF-8 python2 "$BIN" %X "$unicode_value" </dev/null 2>&1 >/dev/null)"; then
+    fail "Python 2 command-line unicode" "non-zero exit" "zero exit"
+  fi
+  check_contains "Python 2 command-line unicode" "$unicode_error" "$stderr"
+
+  # 23. Python 2 rejects non-ASCII template input clearly
+  if stderr="$(printf '%s\n' "$unicode_value %X" | LC_ALL=C.UTF-8 python2 "$BIN" %X value 2>&1 >/dev/null)"; then
+    fail "Python 2 template unicode" "non-zero exit" "zero exit"
+  fi
+  check_contains "Python 2 template unicode" "$unicode_error" "$stderr"
+else
+  echo "WARNING: python2 is unavailable; skipping Python 2 unicode tests." >&2
+fi
+
 echo "All tests passed."

@@ -33,6 +33,17 @@ import string
 
 escaped_percentage_sign=u"％"  # abusing unicode character to escape '%'
 
+def reject_unicode_on_python2(value):
+   if sys.version_info[0] < 3:
+      try:
+         if isinstance(value, unicode):
+            value.encode('ascii')
+         else:
+            value.decode('ascii')
+      except UnicodeError:
+         print("catsub does not support unicode when used with python version < 3.", file=sys.stderr)
+         sys.exit(1)
+
 def print_help():
    """print help message for the catsub command"""
    
@@ -228,6 +239,7 @@ def main(filenames, vararg, unescape=False, reportstats=False, multisep=' '):
       # Process each line in the file and make substitutions in each word
       try:
          for line in f:
+            reject_unicode_on_python2(line)
             if unescape:
                line = line.replace('\\%',escaped_percentage_sign)
             else:
@@ -275,6 +287,8 @@ def main(filenames, vararg, unescape=False, reportstats=False, multisep=' '):
 if __name__ == "__main__":
 
    # Parse the arguments and pass to main
+   for arg in sys.argv:
+      reject_unicode_on_python2(arg)
    filestart   = 1
    varstart    = 1
    unescape    = False
