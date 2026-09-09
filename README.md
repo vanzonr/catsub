@@ -6,25 +6,28 @@ template file.
 
 ## Usage:
 
-    catsub [--help] [-s] [-u] [-E] [-D|-dSTR] [TEMPLATEFILES] [%VARNAME VALUE1 VALUE2 ... ]*
+   catsub [FLAGS] [TEMPLATEFILES] [%VARNAME VAL VAL ... | %@file:VARFILE]*
 
-Arguments:
+where:
 
-     TEMPLATEFILES     Name(s) of file(s) containg the template with
-                       variables of the from %VARNAME; If no file name
-                       is given, or the name is '-', catsub will read
-                       from standard input;
-     %VARNAME          Variable name to substitute;
-     VALUE1 VALUE2 ... Values to substitute for the variable. A value
-                       may also be specified as @file:PATH, in which case
-                       each line in PATH is treated as one substitution value;
-     -s                Print statistics to stderr on resolved and unresolved variables.
-     -u                Escaped percentage in template are returned unescaped;
-      -E                Split whitespace-separated values imported with %@file:PATH;
-     -D                Use newline to divide multiple substituted values
-     -dSTR             Use STR to divide multiple substituted values
-     --help            Show this help page.
+    TEMPLATEFILES  Name(s) of file(s) containg the template with
+                   variables of the from %VARNAME; If no file name
+                   is given, or the name is '-', catsub will read
+                   from standard input;
+    %VARNAME       Variable name to substitute;
+    VAL VAL ...    Values to substitute for the variable. A VAL may
+                    also be given as @file:PATH, in which case each line
+                   in PATH is appended as one substitution value.
+    %@file:VARFILE Import "%VARNAME VAL ..." expresssions from file VARFILE. 
 
+    FLAGS:
+       -s          Print statistics to stderr on resolved/nresolved variables.
+       -u          Escaped percentage in template are returned unescaped;
+       -E          Split whitespace-separated values imported with %@file:PATH;
+       -dSTR       Use STR to divide multiple substituted values
+       -D          Use newline to divide multiple substituted values
+       -h|--help   Show this help page and exit.
+   
 ## Prerequisites
 
   - Python 2.6+
@@ -42,7 +45,6 @@ so regressions are caught quickly.
 
 ## Notes
 
-
    - The names of the template files may not start with a percent sign.  
 
    - All variables must start with a percent sign and cannot contain
@@ -50,12 +52,8 @@ so regressions are caught quickly.
 
    - Substituted values cannot start with a percent sign.
 
-   - Values may be loaded from a file using @file:PATH; each line in the
-     file becomes one substitution value.
-
-   - Values may also be imported as command-line arguments using %@file:PATH;
-     each non-empty line becomes one value. Use -E to split those lines on
-     whitespace instead.
+   - Values may be loaded from a file with @file:PATH; each line in the
+     file is treated as one substitution value.
 
    - @file: sources are restricted to the current working directory,
      one of the (sub) directories in which the template files reside,
@@ -64,7 +62,11 @@ so regressions are caught quickly.
    - Substitution happens only once per variable, i.e., substituted
      values do not undergo subsequent substitutions.
 
-   - When a variable has been given several values to substitute ad
+   - When substituting several values, those values are separated by a
+     space, by a newline if the -D argument was given, or by STR if
+     the -dSTR argument was given.
+
+   - When a variable has been given several values to substitute and
      the variable occurs in a substring of a word in the template,
      that word get repeated. E.g. "echo un%X | catsub %X kind tidy"
      gives "unkind untidy"
