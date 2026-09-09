@@ -25,30 +25,21 @@
 #
 
 from __future__ import print_function
-import sys
-import re
+
 import collections
 import os
+import re
 import string
+import sys
 
-escaped_percentage_sign=u"％"  # abusing unicode character to escape '%'
+escaped_percentage_sign = u"％"  # abusing unicode character to escape '%'
 
-def reject_unicode_on_python2(value):
-   if sys.version_info[0] < 3:
-      try:
-         if isinstance(value, unicode):
-            value.encode('ascii')
-         else:
-            value.decode('ascii')
-      except UnicodeError:
-         print("catsub does not support unicode when used with python version < 3.", file=sys.stderr)
-         sys.exit(1)
 
 def print_help():
-   """print help message for the catsub command"""
-   
-   print(r"""
-   catsub - substitutes every value for each variable 
+    """print help message for the catsub command"""
+
+    print(r"""
+   catsub - substitutes every value for each variable
             in each word of a template file.
 
    Usage:
@@ -65,20 +56,20 @@ def print_help():
      VAL VAL ...    Values to substitute for the variable. A VAL may
                     also be given as @file:PATH, in which case each line
                     in PATH is appended as one substitution value.
-     %@file:VARFILE Import "%VARNAME VAL ..." expresssions from file VARFILE. 
+     %@file:VARFILE Include "%VARNAME VAL ..." expresssions from file VARFILE.
 
      FLAGS:
 
        -s          Print statistics to stderr on resolved/nresolved variables.
        -u          Escaped percentage in template are returned unescaped;
-       -E          Split whitespace-separated values imported with %@file:PATH;
+       -E          Split whitespace-separated values included with @file:PATH;
        -dSTR       Use STR to divide multiple substituted values
        -D          Use newline to divide multiple substituted values
        -h|--help   Show this help page and exit.
 
-   Notes: 
+   Notes:
 
-   - The names of the template files may not start with a percent sign.  
+   - The names of the template files may not start with a percent sign.
 
    - All variables must start with a percent sign and cannot contain
      whitespace.
@@ -114,7 +105,7 @@ def print_help():
      "%HELLOWORLD", both %HELLO and %HELLOWORLD could be substituted
      if values for both are specified on the catsub command, but it is
      the longer %HELLOWORLD that gets used.
-   
+
    - Percentage signs in the template can escape substitution by
      prepeding them with a slash, i.e., '\%'.  Every '\%' in the
      template will be remain a '\%' unless the -u argument is used in
@@ -132,258 +123,316 @@ def print_help():
      Greetings universe!
 """)
 
-def is_allowed_path(path, allowed):
-   """Check whether a path is inside an allowed directory.
 
-   In addition to the list of paths in 'allowed', paths under 
-   ``/tmp`` or ``/dev/shm`` are allowed if the path is owned 
-   by the current user.
+def reject_unicode_on_python2(strval):
+    """
+    Reject unicode input in python2. Not supported, won't fix.
 
-   Paths are resolved before comparison. 
-   
-   Args:
-      path:   The path to check.
-      allowed: Directories under which resolved paths are permitted.
-
-   Returns:
-      True if the path is permitted, otherwise False.
-   """
-   assert(isinstance(path,str))
-   assert(isinstance(allowed,list))
-   realpath = os.path.realpath(path)
-   for allow in allowed:
-      allow = os.path.realpath(allow)
-      if realpath==allow or realpath.startswith(allow+os.sep):
-         return True
-   for trusted in ['/tmp', '/dev/shm']:
-      trusted = os.path.realpath(trusted)
-      if realpath == trusted or realpath.startswith(trusted + os.sep):
-         try:
-            if os.stat(path).st_uid == os.getuid():
-               return True
-         except OSError:
-            return False
-   return False
-
-
-def import_variable_value_file(varvals, splitlines=False):
-   r"""
-   Process the varvals list and allow values to be imported from files with %@file:PATH.
-   Return a new varvals list with the %@file:PATH replaced by the contents of the file.
-   """
-   newvarvals = []
-   lastargwasfile = False
-   for arg in varvals:
-      if arg.startswith('%@file:'):
-         filename = arg[len('%@file:'):]
-         if filename == '':
-            print("catsub error - empty file name in '%@file:' value.", file=sys.stderr)
-            sys.exit(1)
-         if not is_allowed_path(filename, [os.getcwd()]):
-            print("catsub error - file '" + filename + "' is outside the allowed directories.", file=sys.stderr)
-            sys.exit(1)
-         try:
-            if not os.path.isfile(filename) or not os.access(filename, os.R_OK):
-               raise IOError
-            with open(filename,'r') as f:
-               expectfirstvar = True
-               for line in f:
-                  value = line.rstrip('\r\n').lstrip()
-                  if value == '':
-                     continue
-                  if expectfirstvar:
-                     if not value.startswith('%'):
-                        print("catsub error - first non-empty value in file '" + filename + "' must start with '%'.", file=sys.stderr)
-                        sys.exit(1)
-                     expectfirstvar = False
-                  if splitlines:
-                     newvarvals.extend(value.split())
-                  else:
-                     newvarvals.append(value)
-               if expectfirstvar:
-                  print("catsub error - file '" + filename + "' has no non-empty value.", file=sys.stderr)
-                  sys.exit(1)
-            lastargwasfile = True
-         except (IOError, OSError):
-            print("catsub error - could not open file '" + filename + "'.", file=sys.stderr)
-            sys.exit(1)
-      else:
-         if len(arg) > 0 and arg[0] != '%' and lastargwasfile:
-            print("catsub error - value '" + arg + "' after '%@file:' must start with '%'.", file=sys.stderr)
-            sys.exit(1)
-         newvarvals.append(arg)
-         lastargwasfile = False
-   return newvarvals
-
-
-def substitute(templatefiles, varvals, unescape=False, reportstats=False, multisep=' '):
-   """
-   Process the template in templatefiles, given the argument list with
-   variable definitions in varvals, possibly resolving escaped
-   percentages intact.
-
-   Arguments:
-
-     templatefiles list of template files (where '-' means use stdin)
-     varvals       list of variable names and values
-     unescape:     if True, replace '\' followed by '%' in the templates by '%'
-     reportstats:  if True, report unsubstituted variable names to stderr
-     multisep:     string to separate multiple substituted values in a word
-   """
-   assert(isinstance(templatefiles,list))
-   assert(isinstance(varvals,list))
-   assert(isinstance(unescape,bool))
-   assert(isinstance(reportstats,bool))
-   assert(isinstance(multisep,str))
-   # Collect allowed directories for @file:PATH values
-   allowed = [os.getcwd()]
-   for filename in templatefiles:
-      if filename != '-' and filename != '':
-         allowed.append(os.path.dirname(os.path.abspath(filename)))
-   # Collect values for each variable from the command line.
-   values  = collections.defaultdict(list)
-   varname = '%DEFAULT'
-   fileopt ='@file:'
-   for arg in varvals:
-      if len(arg)>0 and arg[0] == '%':
-         if len(re.split(r'(\s+)', arg))==1:
-            varname = arg
-         else:
-            print("catsub error - '"+arg+"' is not a valid variable name.")
-            sys.exit(1)
-      else:
-         if arg.startswith(fileopt):
-            filename = arg[len(fileopt):]
-            try:
-               if filename == '':
-                  raise ValueError("catsub error - empty file name in '@file:' value.")
-               if not is_allowed_path(filename, allowed):
-                  raise ValueError("catsub error - file '" + filename + "' is outside the allowed directories.")
-               if not os.path.isfile(filename) or not os.access(filename, os.R_OK):
-                  raise IOError
-               with open(filename,'r') as f:
-                  for line in f:
-                     # Ensure repeated substitution does not occur by escaping percentage signs
-                     values[varname].append(line.rstrip('\r\n').replace('%',escaped_percentage_sign))
-            except (IOError, OSError):
-               print("catsub error - could not open file '" + filename + "'.", file=sys.stderr)
-               sys.exit(1)
-            except ValueError as e:
-               print(str(e), file=sys.stderr)
-               sys.exit(1)
-         else:
-            # Ensure repeated substitution does not occur by escaping percentage signs
-            values[varname].append(arg.replace('%',escaped_percentage_sign))
-
-   # if no files given, read from stdin, signaled by '-' as a filename
-   if templatefiles == []:
-      templatefiles = ['-']
-
-   # keep track of variables in files that are not used
-   if reportstats:
-      allvars = set()
-      usedvars = set()
-
-   # process files   
-   for filename in templatefiles:
-      # open file or use standard in
-      if filename == '-':
-         f = sys.stdin
-      else:
-         try:
-            f = open(filename, 'r')
-         except:
-            print("catsub error - could not open file '" + filename + "'.")
-            sys.exit(1)
-      # Process each line in the file and make substitutions in each word
-      try:
-         for line in f:
-            reject_unicode_on_python2(line)
-            if unescape:
-               line = line.replace('\\%',escaped_percentage_sign)
+    Arg:
+      strval: A string value that could be ascii or unicode.
+    """
+    if sys.version_info[0] < 3:
+        try:
+            if isinstance(strval, unicode):
+                strval.encode('ascii')
             else:
-               line = line.replace('\\%','\\'+escaped_percentage_sign)
-            words = re.split(r'(\s+)', line)
-            if reportstats:
-               for word in words:
-                  allvars |= set(word.split('%')[1:])
-            for wordidx in range(len(words)):
-               for varname in sorted(values.keys(),reverse=True):
-                  if varname in words[wordidx]:
-                     if reportstats:
-                        usedvars.add(varname[1:])
-                     replacements = []
-                     for value in values[varname]:
-                        replacements.append(words[wordidx].replace(varname,value))
-                     words[wordidx] = multisep.join(replacements)
-            replacedline = ''.join(words)
-            # Undo escaping of percentage sign
-            print(replacedline.replace(escaped_percentage_sign,'%'),end='')
-      except:
-         # Reading file or processing went wrong
-         print("catsub error - could not process file '" + filename + "'.")
-         sys.exit(1)
-      if filename != '-':
-         f.close()
-   if reportstats:
-      if len(values)!=len(usedvars):
-         print("Unused variables:", file=sys.stderr)
-         for word in values.keys():
-            if not word[1:] in usedvars:
-               print(word, file=sys.stderr)
-      if len(usedvars)>0:
-         print("Substituted variables:", file=sys.stderr)
-         for word in usedvars:
-            print('%'+word, file=sys.stderr)
-      unsubstitutedvars = [var for var in allvars if not any(var.startswith(used) for used in usedvars) and not all(c in string.punctuation for c in var)]
-      if len(unsubstitutedvars) > 0:
-         print("Unsubstituted variables present in template:", file=sys.stderr)
-         for word in unsubstitutedvars:
-            print('%'+word, file=sys.stderr)
-
-## Start of application ##
-
-def main(argv):
-   # Parse the arguments and pass to main
-   for arg in argv:
-      reject_unicode_on_python2(arg)
-   filestart   = 1
-   varstart    = 1
-   unescape    = False
-   splitlines  = False
-   reportstats = False
-   multisep    = ' '
-   readopts  = True   # start reading option
-   for i in range(1,len(argv)):
-      if readopts and len(argv[i]) > 0 and argv[i][0] == '-':
-         if argv[i] in ('--help','-h'):
-            print_help()
-            sys.exit(0)
-         elif argv[i] == '-u':
-            unescape=True
-         elif argv[i] == '-E':
-            splitlines = True
-         elif argv[i] == '-s':
-            reportstats = True
-         elif argv[i] == '-D':
-            multisep = '\n'
-         elif argv[i][:2] == '-d':
-            multisep = argv[i][2:]
-         else:
-            print("catsub error - unknown option '" + argv[i] + "'.")
+                strval.decode('ascii')
+        except UnicodeError:
+            print("catsub does not support unicode",
+                  "when used with python version < 3.",
+                  file=sys.stderr)
             sys.exit(1)
-         filestart = i + 1
-         varstart  = i + 1
-      else:
-         optionson = False
-         if len(argv[i]) > 0 and argv[i][0] == '%':
-            varstart = i
-            break
-         else:
-            varstart = i+1
-   templatefiles = argv[filestart:varstart]
-   subslist = import_variable_value_file(argv[varstart:], splitlines=splitlines)
-   substitute(templatefiles, subslist, unescape=unescape, reportstats=reportstats,multisep=multisep)
 
+
+def is_allowed_path(path, allowed, if_user_owned):
+    """Check whether a path is inside an allowed directory.
+
+    In addition to the list of paths in 'allowed', paths in
+    'if_user_owned' are allowed if the path is owned
+    by the current user.
+
+    Paths are resolved before comparison.
+
+    Args:
+       path:          The path to check.
+       allowed:       Directories under which resolved paths are permitted.
+       if_user_owned: Directories under which resolved paths are permitted iff user owned.
+    
+    Returns:
+       True if the path is permitted, otherwise False.
+    """
+
+    assert(isinstance(path, str))
+    assert(isinstance(allowed, list))
+
+    realpath = os.path.realpath(path)
+    for allow in allowed:
+        allow = os.path.realpath(allow)
+        if realpath == allow or realpath.startswith(allow + os.sep):
+            return True
+    for trusted in if_user_owned:
+        trusted = os.path.realpath(trusted)
+        if realpath == trusted or realpath.startswith(trusted + os.sep):
+            try:
+                if os.stat(path).st_uid == os.getuid():
+                    return True
+            except OSError:
+                return False
+    return False
+
+
+def include_variable_value_file(varvals, allowed, splitlines=False):
+    """
+    Process the varvals list and allow variable substitutions to be
+    included from files with %@file:PATH, if the PATH is under one
+    of the allowed paths.
+
+    Also checks if the file's first non-empty line starts with a %,
+    and whether the next argument is a variable name (starts with %).
+    This is necessary to make sure the file contains substitution
+    rules, rather than values, and that the arguments on the command
+    line do not change meaning due to the file's content.
+
+    Args:
+      varvals:    orginal command arguments after the template files
+      allowed:    list of paths from which files may be imported
+      splitlines: indicates whether the included files lines should
+                  be split into separate values (default: False)
+
+    Returns:
+      A new varvals list with the %@file:PATH replaced by the
+      contents of the file.
+    """
+
+    assert(isinstance(varvals, list))
+    assert(isinstance(allowed, list))
+    assert(isinstance(splitlines, bool))
+
+    newvarvals = []
+    lastargwasfile = False
+    for arg in varvals:
+        if arg.startswith('%@file:'):
+            filename = arg[len('%@file:'):]
+            try:
+                if filename == '':
+                    raise ValueError("catsub error - empty file name in '%@file:' value.")
+                if not is_allowed_path(filename, allowed, ['/tmp', '/dev/shm']):
+                    raise ValueError("catsub error - file '" + filename + "' is outside the allowed directories.")
+                if not os.path.isfile(filename) or not os.access(filename, os.R_OK):
+                    raise OSError
+                with open(filename, 'r') as f:
+                    expectfirstvar = True
+                    for line in f:
+                        value = line.rstrip('\r\n').lstrip()
+                        if value == '':
+                            continue
+                        if expectfirstvar:
+                            if not value.startswith('%'):
+                                raise ValueError("catsub error - first non-empty value in file '" + filename + "' must start with '%'.")
+                            expectfirstvar = False
+                        if splitlines:
+                            newvarvals.extend(value.split())
+                        else:
+                            newvarvals.append(value)
+                    if expectfirstvar:
+                        raise ValueError("catsub error - file '" + filename + "' has no non-empty value.")
+                lastargwasfile = True
+            except OSError:
+                print("catsub error - could not open file '" + filename + "'.",
+                      file=sys.stderr)
+                sys.exit(1)
+            except ValueError as e:
+                print(str(e), file=sys.stderr)
+                sys.exit(1)
+        else:
+            if len(arg) > 0 and arg[0] != '%' and lastargwasfile:
+                print("catsub error - value '" + arg + "' after",
+                      "'%@file:' must start with '%'.",
+                      file=sys.stderr)
+                sys.exit(1)
+            newvarvals.append(arg)
+            lastargwasfile = False
+    return newvarvals
+
+
+def substitute(templatefiles, varvals, allowed, unescape=False, reportstats=False, multisep=' '):
+    """
+    Process the template in templatefiles, given the argument list with
+    variable definitions in varvals, possibly resolving escaped
+    percentages intact.
+
+    Arguments:
+
+      templatefiles list of template files (where '-' means use stdin)
+      varvals       list of variable names and values
+      allowed       list of paths from which files may be included
+      unescape:     if True, replace '\' followed by '%' in the templates by '%'
+      reportstats:  if True, report unsubstituted variable names to stderr
+      multisep:     string to separate multiple substituted values in a word
+    """
+
+    assert(isinstance(templatefiles, list))
+    assert(isinstance(varvals, list))
+    assert(isinstance(unescape, bool))
+    assert(isinstance(reportstats, bool))
+    assert(isinstance(multisep, str))
+
+    # Collect values for each variable from the command line.
+    values  = collections.defaultdict(list)
+    varname = '%DEFAULT'
+    fileopt = '@file:'
+    for arg in varvals:
+        if len(arg) > 0 and arg[0] == '%':
+            if len(re.split(r'(\s+)', arg)) == 1:
+                varname = arg
+            else:
+                print("catsub error - '"+arg+"' is not a valid variable name.",
+                      file=sys.stderr)
+                sys.exit(1)
+        else:
+            if arg.startswith(fileopt):
+                filename = arg[len(fileopt):]
+                try:
+                    if filename == '':
+                        raise ValueError("catsub error - empty file name in '@file:' value.")
+                    if not is_allowed_path(filename, allowed, ['/tmp', '/dev/shm']):
+                        raise ValueError("catsub error - file '" + filename + "' is outside the allowed directories.")
+                    if not os.path.isfile(filename) or not os.access(filename, os.R_OK):
+                        raise OSError
+                    with open(filename, 'r') as f:
+                        for line in f:
+                            # Ensure repeated substitution does not occur by escaping percentage signs
+                            values[varname].append(line.rstrip('\r\n').replace('%', escaped_percentage_sign))
+                except OSError:
+                    print("catsub error - could not open file '" + filename + "'.",
+                          file=sys.stderr)
+                    sys.exit(1)
+                except ValueError as e:
+                    print(str(e),
+                          file=sys.stderr)
+                    sys.exit(1)
+            else:
+                # Ensure repeated substitution does not occur by escaping percentage signs
+                values[varname].append(arg.replace('%', escaped_percentage_sign))
+    # if no files given, read from stdin, signaled by '-' as a filename
+    if templatefiles == []:
+        templatefiles = ['-']
+    # keep track of variables in files that are not used
+    if reportstats:
+        allvars = set()
+        usedvars = set()
+    # process templates
+    for filename in templatefiles:
+        # open file or use standard in
+        if filename == '-':
+            f = sys.stdin
+        else:
+            try:
+                f = open(filename, 'r')
+            except:
+                print("catsub error - could not open file '" + filename + "'.",
+                      file=sys.stderr)
+                sys.exit(1)
+        # Process each line in the file and make substitutions in each word
+        try:
+            for line in f:
+                reject_unicode_on_python2(line)
+                if unescape:
+                    line = line.replace('\\%', escaped_percentage_sign)
+                else:
+                    line = line.replace('\\%', '\\' + escaped_percentage_sign)
+                words = re.split(r'(\s+)', line)
+                if reportstats:
+                    for word in words:
+                        allvars |= set(word.split('%')[1:])
+                for wordidx in range(len(words)):
+                    for varname in sorted(values.keys(), reverse=True):
+                        if varname in words[wordidx]:
+                            if reportstats:
+                                usedvars.add(varname[1:])
+                            replacements = []
+                            for value in values[varname]:
+                                replacements.append(words[wordidx].replace(varname, value))
+                            words[wordidx] = multisep.join(replacements)
+                replacedline = ''.join(words)
+                # Undo escaping of percentage sign
+                print(replacedline.replace(escaped_percentage_sign, '%'), end='')
+        except:
+            # Reading file or processing went wrong
+            print("catsub error - could not process file '" + filename + "'.")
+            sys.exit(1)
+        if filename != '-':
+            f.close()
+    if reportstats:
+        if len(values) != len(usedvars):
+            print("Unused variables:", file=sys.stderr)
+            for word in values.keys():
+                if not word[1:] in usedvars:
+                    print(word, file=sys.stderr)
+        if len(usedvars) > 0:
+            print("Substituted variables:", file=sys.stderr)
+            for word in usedvars:
+                print('%'+word, file=sys.stderr)
+        unsubstitutedvars = [var for var in allvars
+                             if not any(var.startswith(used) for used in usedvars)
+                             and not all(c in string.punctuation for c in var)]
+        if len(unsubstitutedvars) > 0:
+            print("Unsubstituted variables present in template:", file=sys.stderr)
+            for word in unsubstitutedvars:
+                print('%'+word, file=sys.stderr)
+
+
+# Main function
+def main(argv):
+    # Parse the arguments
+    for arg in argv:
+        reject_unicode_on_python2(arg)
+    filestart = 1
+    varstart = 1
+    unescape = False
+    splitlines = False
+    reportstats = False
+    multisep = ' '
+    readopts = True   # start reading option
+    for i in range(1, len(argv)):
+        if readopts and len(argv[i]) > 0 and argv[i][0] == '-':
+            if argv[i] in ('--help', '-h'):
+                print_help()
+                sys.exit(0)
+            elif argv[i] == '-u':
+                unescape = True
+            elif argv[i] == '-E':
+                splitlines = True
+            elif argv[i] == '-s':
+                reportstats = True
+            elif argv[i] == '-D':
+                multisep = '\n'
+            elif argv[i][:2] == '-d':
+                multisep = argv[i][2:]
+            else:
+                print("catsub error - unknown option '" + argv[i] + "'.",
+                      file=sys.stderr)
+                sys.exit(1)
+            filestart = i + 1
+            varstart = i + 1
+        else:
+            if len(argv[i]) > 0 and argv[i][0] == '%':
+                varstart = i
+                break
+            else:
+                varstart = i+1
+    # Collect allowed directories for @file:PATH and %@file:PATH values
+    # remainder are the template files , followed by substitution rules
+    templatefiles = argv[filestart:varstart]
+    varvallistargs = argv[varstart:]
+    allowed = [os.getcwd()]  # not all paths are allowed to get file included from.
+    for filename in templatefiles:
+        if filename != '-' and filename != '':
+            allowed.append(os.path.dirname(os.path.abspath(filename)))
+    subslist = include_variable_value_file(varvallistargs, allowed, splitlines=splitlines)
+    substitute(templatefiles, subslist, allowed, unescape=unescape, reportstats=reportstats, multisep=multisep)
+
+    
+# Application starts here
 if __name__ == "__main__":
-   main(sys.argv)
+    main(sys.argv)
