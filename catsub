@@ -171,12 +171,13 @@ def import_variable_value_file(varvals, splitlines=False):
    Process the varvals list and allow values to be imported from files with %@file:PATH.
    Return a new varvals list with the %@file:PATH replaced by the contents of the file.
    """
-   newvarvals=[]
+   newvarvals = []
+   lastargwasfile = False
    for arg in varvals:
       if arg.startswith('%@file:'):
          filename = arg[len('%@file:'):]
          if filename == '':
-            print("catsub error - empty file name in '@file:' value.", file=sys.stderr)
+            print("catsub error - empty file name in '%@file:' value.", file=sys.stderr)
             sys.exit(1)
          if not is_allowed_path(filename, [os.getcwd()]):
             print("catsub error - file '" + filename + "' is outside the allowed directories.", file=sys.stderr)
@@ -202,11 +203,16 @@ def import_variable_value_file(varvals, splitlines=False):
                if expectfirstvar:
                   print("catsub error - file '" + filename + "' has no non-empty value.", file=sys.stderr)
                   sys.exit(1)
+            lastargwasfile = True
          except (IOError, OSError):
             print("catsub error - could not open file '" + filename + "'.", file=sys.stderr)
             sys.exit(1)
       else:
+         if len(arg) > 0 and arg[0] != '%' and lastargwasfile:
+            print("catsub error - value '" + arg + "' after '%@file:' must start with '%'.", file=sys.stderr)
+            sys.exit(1)
          newvarvals.append(arg)
+         lastargwasfile = False
    return newvarvals
 
 

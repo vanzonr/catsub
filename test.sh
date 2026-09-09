@@ -99,6 +99,10 @@ if [[ -d /tmp ]]; then
   printf '%s\n' 'alpha' > "$invalid_percent_file"
   expect_fail "percent file import requires leading percent" bash -c "echo '%X' | \"$BIN\" %X %@file:\"$invalid_percent_file\""
   rm -f "$invalid_percent_file"
+  invalid_percent_file=$(mktemp /tmp/catsub-percent-values.XXXXXX)
+  printf '%s\n' '%X' 'alpha' > "$invalid_percent_file"
+  expect_fail "value after percent file requires leading percent" bash -c "echo '%X' | \"$BIN\" %@file:\"$invalid_percent_file\" bad"
+  rm -f "$invalid_percent_file"
 else
   echo "WARNING: /tmp does not exist; skipping percent file import test." >&2
 fi
